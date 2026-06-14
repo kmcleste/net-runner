@@ -9,6 +9,7 @@ import { TopologyView } from './components/TopologyView'
 import { useIsMobile } from './hooks/useIsMobile'
 import { useSimulation } from './hooks/useSimulation'
 import { APICallResult } from './types'
+import { c, font } from './theme'
 
 type MobileTab = 'topology' | 'alerts' | 'chaos'
 
@@ -32,12 +33,12 @@ export default function App() {
   if (sim.loading) {
     return (
       <div style={loadingStyle}>
-        <div style={{ fontSize: 28 }}>◈</div>
-        <div style={{ fontSize: 14, color: '#22c55e', letterSpacing: 2 }}>net-runner</div>
-        <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>connecting to sim engine...</div>
+        <div style={{ fontSize: 30, color: c.accent, textShadow: `0 0 16px ${c.accent}aa` }}>◈</div>
+        <div style={{ fontSize: 15, color: c.text, letterSpacing: 3, fontWeight: 600 }}>net&#8209;runner</div>
+        <div style={{ fontSize: 11, color: c.faint, marginTop: 4 }}>linking to sim engine…</div>
         <style>{`@keyframes slide { from{left:-40%} to{left:100%} }`}</style>
-        <div style={{ width: 160, height: 2, background: '#1e293b', borderRadius: 2, overflow: 'hidden', position: 'relative', marginTop: 16 }}>
-          <div style={{ position: 'absolute', width: '40%', height: '100%', background: '#22c55e', animation: 'slide 1.5s infinite' }} />
+        <div style={{ width: 180, height: 2, background: c.line, borderRadius: 2, overflow: 'hidden', position: 'relative', marginTop: 18 }}>
+          <div style={{ position: 'absolute', width: '40%', height: '100%', background: c.accent, boxShadow: `0 0 10px ${c.accent}`, animation: 'slide 1.5s infinite' }} />
         </div>
       </div>
     )
@@ -48,7 +49,7 @@ export default function App() {
   // -----------------------------------------------------------------------
   if (isMobile) {
     return (
-      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#111827', fontFamily: 'Courier New, monospace', overflow: 'hidden' }}>
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: 'transparent', fontFamily: font.sans, overflow: 'hidden' }}>
         <Dashboard
           summary={sim.summary}
           sites={sim.sites}
@@ -128,7 +129,7 @@ export default function App() {
   // Desktop layout — side-by-side panels
   // -----------------------------------------------------------------------
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#111827', fontFamily: 'Courier New, monospace' }}>
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: 'transparent', fontFamily: font.sans }}>
       <Dashboard
         summary={sim.summary}
         sites={sim.sites}
@@ -179,11 +180,17 @@ export default function App() {
 function DisconnectBanner() {
   return (
     <div style={{
-      position: 'fixed', top: 60, left: '50%', transform: 'translateX(-50%)',
-      background: '#450a0a', border: '1px solid #ef4444', borderRadius: 6,
-      padding: '6px 14px', fontSize: 11, color: '#fca5a5', zIndex: 300,
+      position: 'fixed', top: 66, left: '50%', transform: 'translateX(-50%)',
+      background: c.panel, border: `1px solid ${c.crit}`, borderRadius: 7,
+      padding: '7px 14px', fontSize: 11, color: c.crit, zIndex: 300,
+      display: 'flex', alignItems: 'center', gap: 7,
+      boxShadow: `0 8px 24px rgba(0,0,0,0.5)`,
     }}>
-      ● WebSocket disconnected — reconnecting...
+      <span style={{
+        width: 8, height: 8, borderRadius: '50%', background: c.crit,
+        boxShadow: `0 0 8px ${c.crit}`,
+      }} className="led-pulse" />
+      Link down — reconnecting…
     </div>
   )
 }
@@ -193,9 +200,9 @@ const loadingStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  background: '#111827',
-  fontFamily: 'Courier New, monospace',
-  color: '#f9fafb',
+  background: 'transparent',
+  fontFamily: font.sans,
+  color: c.text,
   flexDirection: 'column',
   gap: 4,
 }

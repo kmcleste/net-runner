@@ -1,4 +1,6 @@
 import { Site, WorldSummary } from '../types'
+import { c, font, radius, tint } from '../theme'
+import { Led } from './Led'
 
 interface Props {
   summary: WorldSummary | null
@@ -13,52 +15,43 @@ export function Dashboard({ summary, sites, selectedSiteId, onSiteChange, onSimC
   if (!summary) {
     return (
       <div style={styles.bar}>
-        <span style={{ color: '#6b7280', fontSize: 12 }}>Connecting...</span>
+        <span style={{ color: c.faint, fontSize: 12 }}>Connecting…</span>
       </div>
     )
   }
 
+  const down = summary.failed_count + summary.unreachable_count
   const healthPct = summary.total_devices > 0
     ? Math.round((summary.healthy_count / summary.total_devices) * 100)
     : 0
-  const healthColor = healthPct > 95 ? '#22c55e' : healthPct > 80 ? '#f59e0b' : '#ef4444'
+  const healthColor = healthPct > 95 ? c.ok : healthPct > 80 ? c.warn : c.crit
   const simDate = new Date(summary.sim_time)
   const timeStr = isNaN(simDate.getTime()) ? '' : simDate.toLocaleTimeString()
 
+  // ---- Mobile -----------------------------------------------------------
   if (isMobile) {
     return (
-      <div style={{ ...styles.bar, flexDirection: 'column', gap: 6, padding: '6px 12px', minHeight: 'auto' }}>
-        {/* Row 1: title + play/pause + speed */}
+      <div style={{ ...styles.bar, flexDirection: 'column', gap: 7, padding: '8px 12px', minHeight: 'auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: '#f9fafb', flex: 1 }}>
-            ◈ net-runner
-          </span>
-          <button
+          <Brand compact />
+          <div style={{ flex: 1 }} />
+          <TransportButton
+            label={summary.is_running ? '❚❚' : '▶'}
+            active={summary.is_running}
             onClick={() => onSimControl(summary.is_running ? 'pause' : 'play')}
-            style={btnStyle(summary.is_running ? '#22c55e' : '#6b7280')}
-          >
-            {summary.is_running ? '⏸' : '▶'}
-          </button>
+          />
           {[10, 60, 300].map(s => (
-            <button key={s} onClick={() => onSimControl('set_speed', s)}
-              style={btnStyle(summary.sim_speed === s ? '#3b82f6' : '#374151', summary.sim_speed === s)}>
-              {s}×
-            </button>
+            <TransportButton key={s} label={`${s}×`} active={summary.sim_speed === s}
+              onClick={() => onSimControl('set_speed', s)} />
           ))}
-          <span style={{ fontSize: 9, color: '#4b5563', marginLeft: 4 }}>{timeStr}</span>
         </div>
 
-        {/* Row 2: KPI pills + site filter */}
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', width: '100%', overflowX: 'auto' }}>
-          <Pill label={`${healthPct}%`} color={healthColor} sublabel="ok" />
-          <Pill label={String(summary.degraded_count)} color="#f59e0b" sublabel="deg" />
-          <Pill label={String(summary.failed_count + summary.unreachable_count)} color="#ef4444" sublabel="down" />
-          <Pill label={String(summary.active_alerts)} color="#f97316" sublabel="alerts" />
-          <select
-            value={selectedSiteId ?? ''}
-            onChange={e => onSiteChange(e.target.value || null)}
-            style={selectStyle}
-          >
+          <Pill led={healthColor} value={`${healthPct}%`} label="ok" />
+          <Pill led={c.warn} value={summary.degraded_count} label="deg" />
+          <Pill led={c.crit} value={down} label="down" pulse={down > 0} />
+          <Pill led={summary.active_alerts > 0 ? c.warn : c.faint} value={summary.active_alerts} label="alerts" />
+          <select value={selectedSiteId ?? ''} onChange={e => onSiteChange(e.target.value || null)} style={selectStyle}>
             <option value=''>All sites</option>
             {Object.values(sites).map(s => (
               <option key={s.id} value={s.id}>{s.city} ({s.site_type})</option>
@@ -69,20 +62,21 @@ export function Dashboard({ summary, sites, selectedSiteId, onSiteChange, onSimC
     )
   }
 
-  // Desktop layout
+  // ---- Desktop ----------------------------------------------------------
   return (
     <div style={styles.bar}>
-      <div style={{ marginRight: 8 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: '#f9fafb' }}>◈ net-runner</div>
-        <div style={{ fontSize: 10, color: '#6b7280' }}>{summary.org_name}</div>
-      </div>
+      <Brand org={summary.org_name} />
 
-      <Chip label="devices" value={summary.total_devices} color="#f9fafb" />
-      <Chip label="healthy" value={`${healthPct}%`} color={healthColor} />
-      <Chip label="degraded" value={summary.degraded_count} color="#f59e0b" />
-      <Chip label="failed" value={summary.failed_count + summary.unreachable_count} color="#ef4444" />
-      <Chip label="alerts" value={summary.active_alerts} color="#f97316" />
-      <Chip label="sites" value={summary.total_sites} color="#f9fafb" />
+      <div style={styles.divider} />
+
+      <Kpi led={healthColor} value={`${healthPct}%`} label="healthy" />
+      <Kpi led={c.warn} value={summary.degraded_count} label="degraded" />
+      <Kpi led={c.crit} value={down} label="down" pulse={down > 0} />
+      <Kpi led={summary.active_alerts > 0 ? c.warn : c.faint} value={summary.active_alerts} label="alerts" />
+      <Kpi led={c.accent} value={summary.total_devices} label="devices" mutedLed />
+      <Kpi led={c.accent} value={summary.total_sites} label="sites" mutedLed />
+
+      <div style={styles.divider} />
 
       <select value={selectedSiteId ?? ''} onChange={e => onSiteChange(e.target.value || null)} style={selectStyle}>
         <option value=''>All sites</option>
@@ -91,80 +85,139 @@ export function Dashboard({ summary, sites, selectedSiteId, onSiteChange, onSimC
         ))}
       </select>
 
-      <div style={{ display: 'flex', gap: 6 }}>
-        <button onClick={() => onSimControl(summary.is_running ? 'pause' : 'play')}
-          style={btnStyle(summary.is_running ? '#22c55e' : '#6b7280')}>
-          {summary.is_running ? '⏸ Pause' : '▶ Play'}
-        </button>
+      <div style={{ display: 'flex', gap: 5 }}>
+        <TransportButton
+          label={summary.is_running ? '❚❚ Pause' : '▶ Run'}
+          active={summary.is_running}
+          onClick={() => onSimControl(summary.is_running ? 'pause' : 'play')}
+        />
         {[1, 10, 60, 300].map(s => (
-          <button key={s} onClick={() => onSimControl('set_speed', s)}
-            style={btnStyle(summary.sim_speed === s ? '#3b82f6' : '#374151', summary.sim_speed === s)}>
-            {s}×
-          </button>
+          <TransportButton key={s} label={`${s}×`} active={summary.sim_speed === s}
+            onClick={() => onSimControl('set_speed', s)} />
         ))}
       </div>
 
-      <div style={{ marginLeft: 'auto', fontSize: 11, color: '#6b7280', fontFamily: 'Courier New, monospace' }}>
-        <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: summary.is_running ? '#22c55e' : '#6b7280', marginRight: 4 }} />
-        {new Date(summary.sim_time).toLocaleString()}
-        <span style={{ marginLeft: 8, color: '#374151' }}>seed:{summary.seed}</span>
+      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: c.dim, fontFamily: font.mono }}
+          className="mono">
+          <Led color={summary.is_running ? c.ok : c.faint} size={8} pulse={summary.is_running} />
+          {timeStr}
+        </span>
+        <span style={{ fontSize: 11, color: c.faint, fontFamily: font.mono, letterSpacing: 0.5 }}>
+          seed&nbsp;{summary.seed}
+        </span>
       </div>
     </div>
   )
 }
 
-function Chip({ label, value, color }: { label: string; value: string | number; color: string }) {
+// ---------------------------------------------------------------------------
+
+function Brand({ org, compact }: { org?: string; compact?: boolean }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', background: '#111827', border: '1px solid #374151', borderRadius: 6, padding: '4px 12px', minWidth: 70 }}>
-      <span style={{ fontSize: 9, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 1 }}>{label}</span>
-      <span style={{ fontSize: 18, fontWeight: 700, color, fontFamily: 'Courier New, monospace' }}>{value}</span>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <span style={{
+        fontSize: 17,
+        color: c.accent,
+        textShadow: `0 0 10px ${tint(c.accent, 0.7)}`,
+        lineHeight: 1,
+      }}>◈</span>
+      <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
+        <span style={{ fontSize: compact ? 13 : 14, fontWeight: 700, color: c.text, letterSpacing: 0.3 }}>
+          net&#8209;runner
+        </span>
+        {!compact && org && (
+          <span style={{ fontSize: 10, color: c.faint, letterSpacing: 0.2 }}>{org}</span>
+        )}
+      </div>
     </div>
   )
 }
 
-function Pill({ label, color, sublabel }: { label: string; color: string; sublabel: string }) {
+function Kpi({ led, value, label, pulse, mutedLed }: {
+  led: string; value: string | number; label: string; pulse?: boolean; mutedLed?: boolean
+}) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 3, background: color + '22', border: `1px solid ${color}`, borderRadius: 12, padding: '2px 8px', whiteSpace: 'nowrap' }}>
-      <span style={{ fontSize: 12, fontWeight: 700, color }}>{label}</span>
-      <span style={{ fontSize: 9, color: '#6b7280' }}>{sublabel}</span>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 4px' }}>
+      <Led color={led} size={mutedLed ? 7 : 9} pulse={pulse} />
+      <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.05 }}>
+        <span className="mono" style={{ fontSize: 18, fontWeight: 600, color: c.text, fontFamily: font.mono }}>
+          {value}
+        </span>
+        <span style={{ fontSize: 9, color: c.faint, textTransform: 'uppercase', letterSpacing: 1.2 }}>
+          {label}
+        </span>
+      </div>
     </div>
   )
 }
 
-const styles = {
+function Pill({ led, value, label, pulse }: { led: string; value: string | number; label: string; pulse?: boolean }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 5,
+      background: c.raised, border: `1px solid ${c.line}`,
+      borderRadius: radius.pill, padding: '3px 9px 3px 7px', whiteSpace: 'nowrap',
+    }}>
+      <Led color={led} size={8} pulse={pulse} />
+      <span className="mono" style={{ fontSize: 12, fontWeight: 600, color: c.text, fontFamily: font.mono }}>{value}</span>
+      <span style={{ fontSize: 9, color: c.faint, textTransform: 'uppercase', letterSpacing: 0.6 }}>{label}</span>
+    </div>
+  )
+}
+
+function TransportButton({ label, active, onClick }: { label: string; active?: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        background: active ? tint(c.accent, 0.16) : 'transparent',
+        border: `1px solid ${active ? c.accent : c.line}`,
+        borderRadius: radius.sm,
+        color: active ? c.accent : c.dim,
+        fontSize: 11,
+        fontWeight: 600,
+        padding: '5px 10px',
+        cursor: 'pointer',
+        whiteSpace: 'nowrap',
+        fontFamily: font.mono,
+        transition: 'border-color 0.15s, color 0.15s',
+      }}
+    >
+      {label}
+    </button>
+  )
+}
+
+const styles: Record<string, React.CSSProperties> = {
   bar: {
     display: 'flex',
     alignItems: 'center',
-    gap: 10,
-    padding: '8px 16px',
-    background: '#1f2937',
-    borderBottom: '1px solid #374151',
+    gap: 12,
+    padding: '0 16px',
+    background: `linear-gradient(180deg, ${c.raised}, ${c.panel})`,
+    borderBottom: `1px solid ${c.line}`,
+    boxShadow: '0 1px 0 rgba(0,0,0,0.4)',
     flexShrink: 0,
-    flexWrap: 'wrap' as const,
-    minHeight: 52,
+    flexWrap: 'wrap',
+    minHeight: 56,
+  },
+  divider: {
+    width: 1,
+    alignSelf: 'stretch',
+    margin: '12px 2px',
+    background: c.line,
   },
 }
 
 const selectStyle: React.CSSProperties = {
-  background: '#111827',
-  border: '1px solid #374151',
-  borderRadius: 6,
-  color: '#d1d5db',
+  background: c.raised,
+  border: `1px solid ${c.line}`,
+  borderRadius: radius.sm,
+  color: c.dim,
   fontSize: 11,
-  padding: '4px 8px',
-  fontFamily: 'Courier New, monospace',
-  maxWidth: 160,
-}
-
-function btnStyle(borderColor: string, active = false): React.CSSProperties {
-  return {
-    background: active ? borderColor + '33' : '#111827',
-    border: `1px solid ${borderColor}`,
-    borderRadius: 4,
-    color: '#f9fafb',
-    fontSize: 11,
-    padding: '4px 10px',
-    cursor: 'pointer',
-    whiteSpace: 'nowrap',
-  }
+  padding: '5px 8px',
+  fontFamily: font.mono,
+  maxWidth: 170,
+  cursor: 'pointer',
 }

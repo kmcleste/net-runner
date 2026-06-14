@@ -1,15 +1,6 @@
 import { ReactNode, useState } from 'react'
 import { APICallResult, Device } from '../types'
-
-const STATE_COLOR: Record<string, string> = {
-  healthy: '#22c55e',
-  degraded: '#f59e0b',
-  failed: '#ef4444',
-  unreachable: '#6b7280',
-  recovering: '#a855f7',
-  rebooting: '#3b82f6',
-  maintenance: '#64748b',
-}
+import { c, stateColor as STATE_COLOR } from '../theme'
 
 const API_PROTOCOL_COLOR: Record<string, string> = {
   ios_xe_restconf: '#1d4ed8',
@@ -92,7 +83,7 @@ export function DevicePanel({ device, onClose, onReboot, onMaintenance, onInject
 
   const containerStyle: React.CSSProperties = inline
     ? { display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }
-    : { position: 'fixed', right: 310, top: 52, width: 380, bottom: 0, background: '#0f172a', borderLeft: '1px solid #1e293b', borderRight: '1px solid #1e293b', display: 'flex', flexDirection: 'column', zIndex: 100, overflow: 'hidden' }
+    : { position: 'fixed', right: 304, top: 56, width: 384, bottom: 0, background: c.panel, borderLeft: `1px solid ${c.line}`, borderRight: `1px solid ${c.line}`, display: 'flex', flexDirection: 'column', zIndex: 100, overflow: 'hidden' }
 
   return (
     <div style={containerStyle}>

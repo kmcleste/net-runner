@@ -1,16 +1,18 @@
 import cytoscape, { Core, ElementDefinition } from 'cytoscape'
 import { useEffect, useRef } from 'react'
 import { Device, DeviceCategory, DeviceState, TopologyData } from '../types'
+import { c, font, radius } from '../theme'
+import { Led } from './Led'
 
-// Color by state
+// Color by state — shared LED palette so nodes match the rest of the console
 const STATE_COLOR: Record<DeviceState, string> = {
-  healthy: '#22c55e',
-  degraded: '#f59e0b',
-  failed: '#ef4444',
-  unreachable: '#6b7280',
-  recovering: '#a855f7',
-  rebooting: '#3b82f6',
-  maintenance: '#64748b',
+  healthy: c.ok,
+  degraded: c.warn,
+  failed: c.crit,
+  unreachable: c.down,
+  recovering: c.recover,
+  rebooting: c.reboot,
+  maintenance: c.maint,
 }
 
 // Shape by category
@@ -54,15 +56,16 @@ function ZoomButton({ label, onClick, title }: { label: string; onClick: () => v
       onClick={onClick}
       title={title}
       style={{
-        width: 32, height: 32,
-        background: 'rgba(17,24,39,0.9)',
-        border: '1px solid #374151',
-        borderRadius: 6,
-        color: '#d1d5db',
+        width: 34, height: 34,
+        background: 'rgba(15,21,32,0.92)',
+        border: `1px solid ${c.line}`,
+        borderRadius: radius.md,
+        color: c.dim,
         fontSize: 18,
         lineHeight: 1,
         cursor: 'pointer',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
+        backdropFilter: 'blur(4px)',
       }}
     >
       {label}
@@ -91,9 +94,9 @@ function buildElements(topology: TopologyData, devices: Record<string, Device>):
         is_consumer: isConsumer,
       },
       style: {
-        'background-color': STATE_COLOR[node.state as DeviceState] ?? '#6b7280',
+        'background-color': STATE_COLOR[node.state as DeviceState] ?? c.down,
         'shape': CATEGORY_SHAPE[node.category as DeviceCategory] ?? 'ellipse',
-        'border-color': isConsumer ? '#f97316' : '#374151',
+        'border-color': isConsumer ? '#f97316' : '#2a3647',
         'border-width': isConsumer ? 3 : 1,
       },
     })
@@ -169,9 +172,9 @@ export function TopologyView({ topology, devices, selectedSiteId, onDeviceClick,
             'label': 'data(label)',
             'text-valign': 'bottom',
             'text-halign': 'center',
-            'color': '#d1d5db',
+            'color': c.dim,
             'font-size': fontSize,
-            'font-family': 'Courier New, monospace',
+            'font-family': "IBM Plex Mono, monospace",
             'text-wrap': 'wrap',
             'text-max-width': `${Math.round((isMobile ? 100 : 90) * uiScale)}px`,
             'text-margin-y': Math.round((isMobile ? 6 : 4) * uiScale),
@@ -180,17 +183,17 @@ export function TopologyView({ topology, devices, selectedSiteId, onDeviceClick,
         {
           selector: 'edge',
           style: {
-            'line-color': '#374151',
+            'line-color': '#2a3647',
             'width': 1.5 * uiScale,
             'target-arrow-shape': 'none',
             'curve-style': 'bezier',
-            'opacity': 0.7,
+            'opacity': 0.6,
           },
         },
         {
           selector: 'node:selected',
           style: {
-            'border-color': '#f9fafb',
+            'border-color': c.accent,
             'border-width': 3,
             'width': nodeSize * 1.25,
             'height': nodeSize * 1.25,
@@ -198,7 +201,7 @@ export function TopologyView({ topology, devices, selectedSiteId, onDeviceClick,
         },
         {
           selector: 'node[state="failed"]',
-          style: { 'border-color': '#ef4444', 'border-width': 2 },
+          style: { 'border-color': c.crit, 'border-width': 2 },
         },
         {
           selector: 'node[state="unreachable"]',
@@ -272,7 +275,9 @@ export function TopologyView({ topology, devices, selectedSiteId, onDeviceClick,
   }
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%', background: '#111827' }}>
+    // transparent so the body's blueprint grid shows behind the graph —
+    // a network diagram on graph paper
+    <div style={{ position: 'relative', width: '100%', height: '100%', background: 'transparent' }}>
       <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
 
       {/* Zoom controls */}
@@ -286,23 +291,25 @@ export function TopologyView({ topology, devices, selectedSiteId, onDeviceClick,
       </div>
 
       <div style={{
-        position: 'absolute', top: 8, right: 8,
-        background: 'rgba(17,24,39,0.9)',
-        border: '1px solid #374151',
-        borderRadius: 6,
-        padding: '8px 12px',
+        position: 'absolute', top: 10, right: 10,
+        background: 'rgba(15,21,32,0.9)',
+        border: `1px solid ${c.line}`,
+        borderRadius: radius.md,
+        padding: '9px 12px',
         fontSize: 11,
-        color: '#9ca3af',
+        color: c.dim,
+        fontFamily: font.sans,
+        backdropFilter: 'blur(4px)',
       }}>
         {Object.entries(STATE_COLOR).map(([state, color]) => (
-          <div key={state} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-            <div style={{ width: 10, height: 10, borderRadius: '50%', background: color }} />
-            <span>{state}</span>
+          <div key={state} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <Led color={color} size={9} pulse={state === 'failed'} />
+            <span style={{ textTransform: 'capitalize' }}>{state}</span>
           </div>
         ))}
-        <div style={{ marginTop: 6, borderTop: '1px solid #374151', paddingTop: 4 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ width: 10, height: 10, border: '2px solid #f97316', borderRadius: 2 }} />
+        <div style={{ marginTop: 7, borderTop: `1px solid ${c.line}`, paddingTop: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ width: 9, height: 9, border: '2px solid #f97316', borderRadius: 2 }} />
             <span>shadow IT</span>
           </div>
         </div>

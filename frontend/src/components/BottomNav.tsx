@@ -1,3 +1,5 @@
+import { c, font, tint } from '../theme'
+
 type Tab = 'topology' | 'alerts' | 'chaos'
 
 interface Props {
@@ -6,24 +8,25 @@ interface Props {
   alertCount: number
 }
 
-const TABS: { id: Tab; icon: string; label: string }[] = [
-  { id: 'topology', icon: '🗺', label: 'Map' },
-  { id: 'alerts', icon: '🔔', label: 'Alerts' },
-  { id: 'chaos', icon: '⚡', label: 'Chaos' },
+const TABS: { id: Tab; glyph: string; label: string }[] = [
+  { id: 'topology', glyph: '◈', label: 'Map' },
+  { id: 'alerts', glyph: '◉', label: 'Alerts' },
+  { id: 'chaos', glyph: '⚡', label: 'Chaos' },
 ]
 
 export function BottomNav({ active, onChange, alertCount }: Props) {
   return (
     <nav style={{
       display: 'flex',
-      background: '#1f2937',
-      borderTop: '1px solid #374151',
+      background: c.panel,
+      borderTop: `1px solid ${c.line}`,
       flexShrink: 0,
       paddingBottom: 'env(safe-area-inset-bottom)',
     }}>
       {TABS.map(tab => {
         const isActive = tab.id === active
         const showBadge = tab.id === 'alerts' && alertCount > 0
+        const tone = tab.id === 'chaos' ? c.crit : c.accent
         return (
           <button
             key={tab.id}
@@ -34,32 +37,39 @@ export function BottomNav({ active, onChange, alertCount }: Props) {
               flexDirection: 'column',
               alignItems: 'center',
               gap: 3,
-              padding: '10px 0 8px',
-              background: 'none',
+              padding: '10px 0 9px',
+              background: isActive ? tint(tone, 0.08) : 'transparent',
               border: 'none',
-              borderTop: isActive ? '2px solid #3b82f6' : '2px solid transparent',
+              borderTop: `2px solid ${isActive ? tone : 'transparent'}`,
               cursor: 'pointer',
               position: 'relative',
             }}
           >
-            <span style={{ fontSize: 20 }}>{tab.icon}</span>
+            <span style={{
+              fontSize: 18,
+              color: isActive ? tone : c.faint,
+              textShadow: isActive ? `0 0 10px ${tint(tone, 0.7)}` : 'none',
+              lineHeight: 1,
+            }}>
+              {tab.glyph}
+            </span>
             <span style={{
               fontSize: 10,
-              fontWeight: isActive ? 700 : 400,
-              color: isActive ? '#f9fafb' : '#6b7280',
-              fontFamily: 'Courier New, monospace',
+              fontWeight: isActive ? 700 : 500,
+              color: isActive ? c.text : c.faint,
+              fontFamily: font.sans,
               textTransform: 'uppercase',
-              letterSpacing: 0.5,
+              letterSpacing: 0.6,
             }}>
               {tab.label}
             </span>
             {showBadge && (
-              <span style={{
+              <span className="mono" style={{
                 position: 'absolute',
                 top: 6,
                 right: '50%',
-                marginRight: -20,
-                background: '#ef4444',
+                marginRight: -22,
+                background: c.crit,
                 color: '#fff',
                 fontSize: 9,
                 fontWeight: 700,
@@ -67,6 +77,8 @@ export function BottomNav({ active, onChange, alertCount }: Props) {
                 padding: '1px 5px',
                 minWidth: 16,
                 textAlign: 'center',
+                fontFamily: font.mono,
+                boxShadow: `0 0 8px ${tint(c.crit, 0.7)}`,
               }}>
                 {alertCount > 99 ? '99+' : alertCount}
               </span>

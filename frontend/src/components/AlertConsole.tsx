@@ -1,19 +1,14 @@
 import { Alert } from '../types'
+import { c, font, radius, sevColor, tint } from '../theme'
+import { Led } from './Led'
 
-const SEVERITY_COLOR: Record<string, { bg: string; text: string; border: string }> = {
-  critical: { bg: '#450a0a', text: '#fca5a5', border: '#ef4444' },
-  high:     { bg: '#431407', text: '#fed7aa', border: '#f97316' },
-  medium:   { bg: '#422006', text: '#fde68a', border: '#f59e0b' },
-  low:      { bg: '#0f172a', text: '#93c5fd', border: '#3b82f6' },
-}
-
-const EVENT_ICON: Record<string, string> = {
-  failure: '💥',
-  cascade: '🌊',
-  manual_injection: '⚡',
-  recovery: '✅',
-  reboot: '🔄',
-  maintenance: '🔧',
+const EVENT_LABEL: Record<string, string> = {
+  failure: 'FAIL',
+  cascade: 'CASCADE',
+  manual_injection: 'INJECT',
+  recovery: 'RECOVER',
+  reboot: 'REBOOT',
+  maintenance: 'MAINT',
 }
 
 interface Props {
@@ -24,136 +19,104 @@ interface Props {
 export function AlertConsole({ alerts, onDeviceClick }: Props) {
   return (
     <div style={{
-      width: 300,
-      minWidth: 300,
-      background: '#0f172a',
-      borderLeft: '1px solid #1e293b',
+      width: 304,
+      minWidth: 304,
+      background: c.panel,
+      borderLeft: `1px solid ${c.line}`,
       display: 'flex',
       flexDirection: 'column',
       overflow: 'hidden',
     }}>
       {/* Header */}
       <div style={{
-        padding: '8px 12px',
-        borderBottom: '1px solid #1e293b',
+        padding: '11px 14px',
+        borderBottom: `1px solid ${c.line}`,
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
       }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: '#f9fafb', letterSpacing: 1, textTransform: 'uppercase' }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: c.text, letterSpacing: 1.5, textTransform: 'uppercase' }}>
           Alert Console
         </span>
-        <span style={{
-          background: '#1e293b',
-          border: '1px solid #374151',
-          borderRadius: 10,
-          padding: '1px 7px',
+        <span className="mono" style={{
+          background: c.raised,
+          border: `1px solid ${c.line}`,
+          borderRadius: radius.pill,
+          padding: '1px 9px',
           fontSize: 10,
-          color: '#9ca3af',
+          color: c.dim,
+          fontFamily: font.mono,
         }}>
           {alerts.length}
         </span>
       </div>
 
-      {/* Alert feed */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: 6 }}>
+      {/* Feed */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
         {alerts.length === 0 && (
-          <div style={{
-            textAlign: 'center',
-            color: '#4b5563',
-            fontSize: 11,
-            marginTop: 24,
-          }}>
-            No alerts yet.<br />Simulation is starting up.
+          <div style={{ textAlign: 'center', color: c.faint, fontSize: 11, marginTop: 28, lineHeight: 1.7 }}>
+            <div style={{ marginBottom: 8 }}><Led color={c.ok} size={10} /></div>
+            All clear.<br />No active alerts.
           </div>
         )}
+
         {alerts.map(alert => {
-          const colors = SEVERITY_COLOR[alert.severity] ?? SEVERITY_COLOR.low
-          const icon = EVENT_ICON[alert.event_type] ?? '•'
+          const sev = sevColor[alert.severity] ?? c.accent
+          const label = EVENT_LABEL[alert.event_type] ?? alert.event_type.toUpperCase()
           const ts = new Date(alert.sim_time)
           const timeStr = isNaN(ts.getTime()) ? '' : ts.toLocaleTimeString()
+          const isDown = alert.new_state === 'failed' || alert.new_state === 'unreachable'
 
           return (
             <div
               key={alert.id}
               onClick={() => onDeviceClick(alert.device_id)}
               style={{
-                background: colors.bg,
-                border: `1px solid ${colors.border}`,
-                borderRadius: 5,
-                padding: '6px 8px',
-                marginBottom: 5,
+                position: 'relative',
+                background: c.raised,
+                border: `1px solid ${c.line}`,
+                borderLeft: `2px solid ${sev}`,
+                borderRadius: radius.md,
+                padding: '8px 10px 8px 11px',
+                marginBottom: 6,
                 cursor: 'pointer',
-                transition: 'opacity 0.1s',
+                transition: 'background 0.12s, border-color 0.12s',
               }}
-              onMouseEnter={e => (e.currentTarget.style.opacity = '0.8')}
-              onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+              onMouseEnter={e => { e.currentTarget.style.background = '#1a2332' }}
+              onMouseLeave={e => { e.currentTarget.style.background = c.raised }}
             >
-              {/* Row 1: severity badge + hostname */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                  <span style={{
-                    fontSize: 9,
-                    fontWeight: 700,
-                    color: colors.border,
-                    textTransform: 'uppercase',
-                    letterSpacing: 0.5,
-                  }}>
-                    {icon} {alert.severity}
-                  </span>
-                  {alert.is_manual && (
-                    <span style={{
-                      fontSize: 8,
-                      background: '#7c3aed',
-                      color: '#e9d5ff',
-                      borderRadius: 3,
-                      padding: '1px 4px',
-                    }}>
-                      MANUAL
-                    </span>
-                  )}
-                  {alert.cascade_from_device_id && (
-                    <span style={{
-                      fontSize: 8,
-                      background: '#164e63',
-                      color: '#67e8f9',
-                      borderRadius: 3,
-                      padding: '1px 4px',
-                    }}>
-                      CASCADE
-                    </span>
-                  )}
-                </div>
-                <span style={{ fontSize: 9, color: '#6b7280' }}>{timeStr}</span>
+              {/* Row 1: LED + severity + tags + time */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+                <Led color={sev} size={8} pulse={isDown} />
+                <span style={{ fontSize: 9, fontWeight: 700, color: sev, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                  {alert.severity}
+                </span>
+                <Tag text={label} color={c.dim} />
+                {alert.is_manual && <Tag text="MANUAL" color={c.human} />}
+                {alert.cascade_from_device_id && <Tag text="CASCADE" color={c.accent} />}
+                <span className="mono" style={{ marginLeft: 'auto', fontSize: 9, color: c.faint, fontFamily: font.mono }}>
+                  {timeStr}
+                </span>
               </div>
 
               {/* Row 2: hostname + vendor */}
-              <div style={{ fontSize: 11, color: colors.text, fontWeight: 600, marginBottom: 2 }}>
+              <div className="mono" style={{ fontSize: 12, color: c.text, fontWeight: 600, fontFamily: font.mono }}>
                 {alert.hostname}
-                <span style={{ fontWeight: 400, color: '#9ca3af', marginLeft: 6, fontSize: 10 }}>
+                <span style={{ fontWeight: 400, color: c.dim, marginLeft: 6, fontSize: 10, fontFamily: font.sans }}>
                   {alert.vendor}
                 </span>
               </div>
 
               {/* Row 3: site */}
-              <div style={{ fontSize: 9, color: '#6b7280', marginBottom: 3 }}>{alert.site_name}</div>
+              <div style={{ fontSize: 9, color: c.faint, margin: '1px 0 4px' }}>{alert.site_name}</div>
 
-              {/* Row 4: message */}
-              <div style={{
-                fontSize: 10,
-                color: '#d1d5db',
-                lineHeight: 1.4,
-                wordBreak: 'break-word',
-              }}>
+              {/* Row 4: failure mode → new state */}
+              <div className="mono" style={{ fontSize: 10, lineHeight: 1.4, fontFamily: font.mono, wordBreak: 'break-word' }}>
                 {alert.failure_mode_id && (
-                  <span style={{ color: colors.text, marginRight: 4 }}>
-                    [{alert.failure_mode_id}]
-                  </span>
+                  <span style={{ color: sev }}>{alert.failure_mode_id}</span>
                 )}
                 {alert.new_state && (
-                  <span style={{ color: '#9ca3af' }}>
-                    → {alert.new_state}
-                  </span>
+                  <span style={{ color: c.dim }}> → {alert.new_state}</span>
                 )}
               </div>
             </div>
@@ -161,5 +124,22 @@ export function AlertConsole({ alerts, onDeviceClick }: Props) {
         })}
       </div>
     </div>
+  )
+}
+
+function Tag({ text, color }: { text: string; color: string }) {
+  return (
+    <span style={{
+      fontSize: 8,
+      fontWeight: 700,
+      letterSpacing: 0.5,
+      color,
+      background: tint(color, 0.13),
+      border: `1px solid ${tint(color, 0.35)}`,
+      borderRadius: 3,
+      padding: '1px 4px',
+    }}>
+      {text}
+    </span>
   )
 }
