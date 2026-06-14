@@ -48,6 +48,28 @@ const VENDOR_BADGE: Record<string, string> = {
   'Ubiquiti': 'UBQT',
 }
 
+function ZoomButton({ label, onClick, title }: { label: string; onClick: () => void; title?: string }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      style={{
+        width: 32, height: 32,
+        background: 'rgba(17,24,39,0.9)',
+        border: '1px solid #374151',
+        borderRadius: 6,
+        color: '#d1d5db',
+        fontSize: 18,
+        lineHeight: 1,
+        cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}
+    >
+      {label}
+    </button>
+  )
+}
+
 function buildElements(topology: TopologyData, devices: Record<string, Device>): ElementDefinition[] {
   const elements: ElementDefinition[] = []
 
@@ -99,6 +121,14 @@ interface Props {
   isMobile?: boolean
 }
 
+// Scale UI up on large / high-DPI displays so a 4K canvas isn't full of
+// tiny nodes. 1.0 at ~1800px logical width, capped at 2.2 for very wide displays.
+function computeUiScale(isMobile: boolean): number {
+  if (isMobile) return 1
+  if (typeof window === 'undefined') return 1
+  return Math.min(2.2, Math.max(1, window.innerWidth / 1800))
+}
+
 export function TopologyView({ topology, devices, selectedSiteId, onDeviceClick, isMobile = false }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const cyRef = useRef<Core | null>(null)
@@ -123,8 +153,9 @@ export function TopologyView({ topology, devices, selectedSiteId, onDeviceClick,
       cyRef.current.destroy()
     }
 
-    const nodeSize = isMobile ? 44 : 32
-    const fontSize = isMobile ? '11px' : '9px'
+    const uiScale = computeUiScale(isMobile)
+    const nodeSize = Math.round((isMobile ? 44 : 34) * uiScale)
+    const fontSize = `${Math.round((isMobile ? 11 : 10) * uiScale)}px`
 
     const cy = cytoscape({
       container: containerRef.current,
@@ -142,15 +173,15 @@ export function TopologyView({ topology, devices, selectedSiteId, onDeviceClick,
             'font-size': fontSize,
             'font-family': 'Courier New, monospace',
             'text-wrap': 'wrap',
-            'text-max-width': isMobile ? '100px' : '80px',
-            'text-margin-y': isMobile ? 6 : 4,
+            'text-max-width': `${Math.round((isMobile ? 100 : 90) * uiScale)}px`,
+            'text-margin-y': Math.round((isMobile ? 6 : 4) * uiScale),
           },
         },
         {
           selector: 'edge',
           style: {
             'line-color': '#374151',
-            'width': 1.5,
+            'width': 1.5 * uiScale,
             'target-arrow-shape': 'none',
             'curve-style': 'bezier',
             'opacity': 0.7,
@@ -161,8 +192,8 @@ export function TopologyView({ topology, devices, selectedSiteId, onDeviceClick,
           style: {
             'border-color': '#f9fafb',
             'border-width': 3,
-            'width': 40,
-            'height': 40,
+            'width': nodeSize * 1.25,
+            'height': nodeSize * 1.25,
           },
         },
         {
@@ -178,7 +209,7 @@ export function TopologyView({ topology, devices, selectedSiteId, onDeviceClick,
         name: 'breadthfirst',
         directed: true,
         padding: 20,
-        spacingFactor: 1.4,
+        spacingFactor: 1.4 * uiScale,
         avoidOverlap: true,
       },
       userZoomingEnabled: true,
@@ -191,13 +222,25 @@ export function TopologyView({ topology, devices, selectedSiteId, onDeviceClick,
       desktopTapThreshold: 4,
     })
 
+    // Once the layout settles, fit the graph to fill the canvas so a narrow
+    // tree doesn't leave most of a wide 4K viewport empty.
+    cy.one('layoutstop', () => cy.fit(undefined, Math.round(40 * uiScale)))
+
     cy.on('tap', 'node', (evt) => {
       onDeviceClick(evt.target.id())
     })
 
     cyRef.current = cy
 
+    // Keep the graph filling the canvas when the window is resized.
+    const handleResize = () => {
+      cy.resize()
+      cy.fit(undefined, Math.round(40 * uiScale))
+    }
+    window.addEventListener('resize', handleResize)
+
     return () => {
+      window.removeEventListener('resize', handleResize)
       cy.destroy()
       cyRef.current = null
     }
@@ -216,9 +259,32 @@ export function TopologyView({ topology, devices, selectedSiteId, onDeviceClick,
     })
   }, [devices])
 
+  const zoomBy = (factor: number) => {
+    const cy = cyRef.current
+    if (!cy) return
+    cy.zoom({ level: cy.zoom() * factor, renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } })
+  }
+
+  const fitView = () => {
+    const cy = cyRef.current
+    if (!cy) return
+    cy.fit(undefined, 40)
+  }
+
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', background: '#111827' }}>
       <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+
+      {/* Zoom controls */}
+      <div style={{
+        position: 'absolute', bottom: 12, right: 12,
+        display: 'flex', flexDirection: 'column', gap: 6, zIndex: 10,
+      }}>
+        <ZoomButton label="+" onClick={() => zoomBy(1.3)} />
+        <ZoomButton label="−" onClick={() => zoomBy(1 / 1.3)} />
+        <ZoomButton label="⤢" onClick={fitView} title="Fit to view" />
+      </div>
+
       <div style={{
         position: 'absolute', top: 8, right: 8,
         background: 'rgba(17,24,39,0.9)',

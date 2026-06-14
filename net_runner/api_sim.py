@@ -37,6 +37,30 @@ class VendorAPIDriver(ABC):
         latency_ms = max(10.0, random.gauss(api.avg_latency_ms, api.latency_stddev_ms))
         await asyncio.sleep(latency_ms / 1000.0)
 
+        # Reachability gate — a powered-off, unreachable, or mid-reboot device
+        # cannot answer its own on-box management plane (RESTCONF, NETCONF,
+        # Redfish, FortiOS, SNMP, SSH). The TCP connection simply times out.
+        # Cloud-managed devices (Meraki, Aruba Central) are the exception: the
+        # vendor cloud is still up, so the call lands but reports the device as
+        # offline — handled in those drivers' _execute via device.state.
+        unreachable_states = {"failed", "unreachable", "rebooting"}
+        if device.state.value in unreachable_states and not api.cloud_dependent:
+            # Model a connection timeout: report a long latency without actually
+            # blocking the caller for the full timeout window.
+            timeout_ms = max(latency_ms, api.avg_latency_ms * 3 + 3000.0)
+            error_msg, quirk = self._unreachable_error(device, action)
+            return RemedyActionResult(
+                success=False,
+                device_id=device.id,
+                action=action,
+                vendor=device.vendor,
+                api_protocol=api.protocol.value,
+                latency_ms=timeout_ms,
+                response={},
+                error=error_msg,
+                vendor_quirk_triggered=quirk,
+            )
+
         # Rate limit simulation
         if api.rate_limit_rps is not None:
             await self._check_rate_limit(device, api.rate_limit_rps)
@@ -92,6 +116,21 @@ class VendorAPIDriver(ABC):
 
     def _vendor_error(self, device: DeviceInstance, action: str) -> tuple[str, Optional[str]]:
         return f"API call failed ({device.sku.api.protocol.value})", None
+
+    def _unreachable_error(self, device: DeviceInstance, action: str) -> tuple[str, Optional[str]]:
+        """Error returned when the device itself is down and can't answer its API."""
+        ip = device.ip_addresses[0] if device.ip_addresses else "unknown"
+        state = device.state.value
+        reason = {
+            "failed": "device is down (hardware/power fault)",
+            "unreachable": "device is isolated — upstream path is down",
+            "rebooting": "management plane is dark during reboot",
+        }.get(state, "device not responding")
+        return (
+            f"Connection timed out: no response from {device.hostname} ({ip}) on "
+            f"{device.sku.api.protocol.value} management interface — {reason}",
+            "device_unreachable",
+        )
 
     _rate_limit_tokens: dict[str, tuple[float, int]] = {}
 
