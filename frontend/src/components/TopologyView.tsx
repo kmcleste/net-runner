@@ -80,26 +80,30 @@ function buildSiteElements(
   sites: Record<string, Site>,
   devices: Record<string, Device>,
   uiScale: number,
+  includeHub: boolean,
 ): ElementDefinition[] {
   const elements: ElementDefinition[] = []
 
-  // Org-wide aggregate for the central WAN core
-  const allIds = Object.values(sites).flatMap(s => s.device_ids)
-  const org = siteStats(allIds, devices)
-  elements.push({
-    group: 'nodes',
-    data: { id: '__wan__', kind: 'core', label: 'WAN\ncore' },
-    style: {
-      'background-color': healthColor(org),
-      'shape': 'hexagon',
-      'width': Math.round(64 * uiScale),
-      'height': Math.round(64 * uiScale),
-      'border-color': c.accent,
-      'border-width': 2,
-      'font-size': `${Math.round(12 * uiScale)}px`,
-      'font-weight': 700,
-    },
-  })
+  // Central WAN core (desktop hub-and-spoke only — on mobile the sites tile
+  // into a grid, where spokes would just be visual noise)
+  if (includeHub) {
+    const allIds = Object.values(sites).flatMap(s => s.device_ids)
+    const org = siteStats(allIds, devices)
+    elements.push({
+      group: 'nodes',
+      data: { id: '__wan__', kind: 'core', label: 'WAN\ncore' },
+      style: {
+        'background-color': healthColor(org),
+        'shape': 'hexagon',
+        'width': Math.round(64 * uiScale),
+        'height': Math.round(64 * uiScale),
+        'border-color': c.accent,
+        'border-width': 2,
+        'font-size': `${Math.round(12 * uiScale)}px`,
+        'font-weight': 700,
+      },
+    })
+  }
 
   for (const site of Object.values(sites)) {
     const st = siteStats(site.device_ids, devices)
@@ -119,10 +123,12 @@ function buildSiteElements(
         'font-size': `${Math.round(11 * uiScale)}px`,
       },
     })
-    elements.push({
-      group: 'edges',
-      data: { id: `wan-${site.id}`, source: '__wan__', target: site.id },
-    })
+    if (includeHub) {
+      elements.push({
+        group: 'edges',
+        data: { id: `wan-${site.id}`, source: '__wan__', target: site.id },
+      })
+    }
   }
 
   return elements
@@ -231,15 +237,26 @@ export function TopologyView({
     let elements: ElementDefinition[]
     let layout: cytoscape.LayoutOptions
     if (siteMode) {
-      elements = buildSiteElements(sites, devices, uiScale)
-      layout = {
-        name: 'concentric',
-        concentric: (n: cytoscape.NodeSingular) => (n.data('kind') === 'core' ? 10 : 1),
-        levelWidth: () => 1,
-        minNodeSpacing: Math.round(48 * uiScale),
-        padding: 30,
-        avoidOverlap: true,
-      } as cytoscape.LayoutOptions
+      elements = buildSiteElements(sites, devices, uiScale, !isMobile)
+      layout = isMobile
+        ? {
+            // Tile the sites into a grid — fills a tall phone screen far better
+            // than a wide ring and keeps every label readable.
+            name: 'grid',
+            avoidOverlap: true,
+            nodeDimensionsIncludeLabels: true,
+            padding: 24,
+            condense: false,
+          } as cytoscape.LayoutOptions
+        : {
+            name: 'concentric',
+            concentric: (n: cytoscape.NodeSingular) => (n.data('kind') === 'core' ? 10 : 1),
+            levelWidth: () => 1,
+            minNodeSpacing: Math.round(48 * uiScale),
+            nodeDimensionsIncludeLabels: true,
+            padding: 30,
+            avoidOverlap: true,
+          } as cytoscape.LayoutOptions
     } else {
       const filtered = {
         nodes: topology.nodes.filter(n => n.site_id === selectedSiteId),
@@ -256,6 +273,7 @@ export function TopologyView({
         padding: 20,
         spacingFactor: 1.4 * uiScale,
         avoidOverlap: true,
+        nodeDimensionsIncludeLabels: true,
       } as cytoscape.LayoutOptions
     }
 
