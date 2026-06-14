@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { ReactNode, useState } from 'react'
 import { APICallResult, Device } from '../types'
 
 const STATE_COLOR: Record<string, string> = {
@@ -374,7 +374,7 @@ export function DevicePanel({ device, onClose, onReboot, onMaintenance, onInject
   )
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div style={{ marginBottom: 16 }}>
       <div style={{
