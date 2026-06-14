@@ -63,6 +63,7 @@ export function DevicePanel({ device, onClose, onReboot, onMaintenance, onInject
   const [apiAction, setApiAction] = useState('get_status')
   const [apiResult, setApiResult] = useState<APICallResult | null>(null)
   const [apiLoading, setApiLoading] = useState(false)
+  const [apiError, setApiError] = useState<string | null>(null)
 
   if (!device) return null
 
@@ -72,9 +73,18 @@ export function DevicePanel({ device, onClose, onReboot, onMaintenance, onInject
   const handleApiCall = async () => {
     setApiLoading(true)
     setApiResult(null)
+    setApiError(null)
     try {
       const result = await onApiCall(device.id, apiAction)
-      setApiResult(result)
+      // Guard: if the response doesn't look like an APICallResult (e.g. backend 404),
+      // surface an error instead of letting a render crash take down the whole app.
+      if (typeof result?.success !== 'boolean') {
+        setApiError(`Unexpected response from backend: ${JSON.stringify(result)}`)
+      } else {
+        setApiResult(result)
+      }
+    } catch (err) {
+      setApiError(err instanceof Error ? err.message : 'Network error — is the backend reachable?')
     } finally {
       setApiLoading(false)
     }
@@ -298,6 +308,22 @@ export function DevicePanel({ device, onClose, onReboot, onMaintenance, onInject
             />
           </div>
 
+          {apiError && (
+            <div style={{
+              padding: '8px 10px',
+              background: '#450a0a',
+              border: '1px solid #ef4444',
+              borderRadius: 4,
+              fontSize: 10,
+              color: '#fca5a5',
+              marginBottom: 8,
+              lineHeight: 1.5,
+              wordBreak: 'break-word',
+            }}>
+              ✗ {apiError}
+            </div>
+          )}
+
           {apiResult && (
             <div>
               <div style={{
@@ -313,7 +339,7 @@ export function DevicePanel({ device, onClose, onReboot, onMaintenance, onInject
                 <span style={{ color: apiResult.success ? '#86efac' : '#fca5a5' }}>
                   {apiResult.success ? '✓ Success' : '✗ Failed'}
                 </span>
-                <span style={{ color: '#9ca3af' }}>{apiResult.latency_ms.toFixed(0)}ms</span>
+                <span style={{ color: '#9ca3af' }}>{(apiResult.latency_ms ?? 0).toFixed(0)}ms</span>
                 <span style={{ color: '#6b7280' }}>{apiResult.api_protocol}</span>
               </div>
               {apiResult.vendor_quirk_triggered && (

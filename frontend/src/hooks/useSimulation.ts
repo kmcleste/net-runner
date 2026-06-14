@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Alert, Device, Site, TopologyData, WorldSummary, WSMessage } from '../types'
 
-const API_BASE = import.meta.env.VITE_API_URL ?? ''
-const API = `${API_BASE}/api`
+// In dev, VITE_API_URL is unset so we use '/api' and Vite's proxy strips it.
+// In production, VITE_API_URL is the full Railway URL with no /api prefix
+// (the backend routes don't have an /api prefix).
+const API = import.meta.env.VITE_API_URL ?? '/api'
 const WS_URL = import.meta.env.VITE_WS_URL
   ?? `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`
 
