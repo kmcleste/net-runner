@@ -66,8 +66,10 @@ export default function App() {
             <TopologyView
               topology={sim.topology}
               devices={sim.devices}
+              sites={sim.sites}
               selectedSiteId={selectedSiteId}
               onDeviceClick={handleDeviceClick}
+              onSiteSelect={setSelectedSiteId}
               isMobile
             />
           </div>
@@ -144,8 +146,10 @@ export default function App() {
           <TopologyView
             topology={sim.topology}
             devices={sim.devices}
+            sites={sim.sites}
             selectedSiteId={selectedSiteId}
             onDeviceClick={handleDeviceClick}
+            onSiteSelect={setSelectedSiteId}
           />
         </div>
 

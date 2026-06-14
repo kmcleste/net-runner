@@ -1,6 +1,6 @@
 import cytoscape, { Core, ElementDefinition } from 'cytoscape'
 import { useEffect, useRef } from 'react'
-import { Device, DeviceCategory, DeviceState, TopologyData } from '../types'
+import { Device, DeviceCategory, DeviceState, Site, TopologyData } from '../types'
 import { c, font, radius } from '../theme'
 import { Led } from './Led'
 
@@ -50,6 +50,128 @@ const VENDOR_BADGE: Record<string, string> = {
   'Ubiquiti': 'UBQT',
 }
 
+// ---------------------------------------------------------------------------
+// Site-level aggregation (the "All sites" overview)
+// ---------------------------------------------------------------------------
+
+interface SiteStats { total: number; healthy: number; impaired: number; failed: number }
+
+function siteStats(deviceIds: string[], devices: Record<string, Device>): SiteStats {
+  let total = 0, healthy = 0, failed = 0
+  for (const id of deviceIds) {
+    const d = devices[id]
+    if (!d) continue
+    total++
+    if (d.state === 'healthy') healthy++
+    else if (d.state === 'failed' || d.state === 'unreachable') failed++
+  }
+  return { total, healthy, impaired: total - healthy, failed }
+}
+
+function healthColor(s: SiteStats): string {
+  if (s.total === 0) return c.down
+  const pct = s.healthy / s.total
+  if (pct >= 0.98) return c.ok
+  if (pct >= 0.85) return c.warn
+  return c.crit
+}
+
+function buildSiteElements(
+  sites: Record<string, Site>,
+  devices: Record<string, Device>,
+  uiScale: number,
+): ElementDefinition[] {
+  const elements: ElementDefinition[] = []
+
+  // Org-wide aggregate for the central WAN core
+  const allIds = Object.values(sites).flatMap(s => s.device_ids)
+  const org = siteStats(allIds, devices)
+  elements.push({
+    group: 'nodes',
+    data: { id: '__wan__', kind: 'core', label: 'WAN\ncore' },
+    style: {
+      'background-color': healthColor(org),
+      'shape': 'hexagon',
+      'width': Math.round(64 * uiScale),
+      'height': Math.round(64 * uiScale),
+      'border-color': c.accent,
+      'border-width': 2,
+      'font-size': `${Math.round(12 * uiScale)}px`,
+      'font-weight': 700,
+    },
+  })
+
+  for (const site of Object.values(sites)) {
+    const st = siteStats(site.device_ids, devices)
+    const size = Math.round((40 + Math.sqrt(st.total) * 5) * uiScale)
+    const shape = site.site_type === 'hq' ? 'diamond'
+      : site.site_type === 'regional' ? 'round-rectangle' : 'ellipse'
+    elements.push({
+      group: 'nodes',
+      data: { id: site.id, kind: 'site', label: `${site.name}\n${st.impaired}/${st.total} impaired` },
+      style: {
+        'background-color': healthColor(st),
+        'shape': shape,
+        'width': size,
+        'height': size,
+        'border-color': st.failed > 0 ? c.crit : '#2a3647',
+        'border-width': st.failed > 0 ? 3 : 1,
+        'font-size': `${Math.round(11 * uiScale)}px`,
+      },
+    })
+    elements.push({
+      group: 'edges',
+      data: { id: `wan-${site.id}`, source: '__wan__', target: site.id },
+    })
+  }
+
+  return elements
+}
+
+// ---------------------------------------------------------------------------
+// Device-level elements (within a single site)
+// ---------------------------------------------------------------------------
+
+function buildElements(topology: TopologyData, devices: Record<string, Device>): ElementDefinition[] {
+  const elements: ElementDefinition[] = []
+
+  for (const node of topology.nodes) {
+    const device = devices[node.id]
+    const vendor = device?.vendor ?? node.vendor
+    const badge = VENDOR_BADGE[vendor] ?? vendor.slice(0, 4).toUpperCase()
+    const isConsumer = node.is_consumer_grade
+
+    elements.push({
+      group: 'nodes',
+      data: {
+        id: node.id,
+        kind: 'device',
+        label: `${node.label}\n${badge}`,
+        category: node.category,
+        state: node.state,
+        vendor,
+        site_id: node.site_id,
+        is_consumer: isConsumer,
+      },
+      style: {
+        'background-color': STATE_COLOR[node.state as DeviceState] ?? c.down,
+        'shape': CATEGORY_SHAPE[node.category as DeviceCategory] ?? 'ellipse',
+        'border-color': isConsumer ? '#f97316' : '#2a3647',
+        'border-width': isConsumer ? 3 : 1,
+      },
+    })
+  }
+
+  for (const edge of topology.edges) {
+    elements.push({
+      group: 'edges',
+      data: { id: `${edge.source}-${edge.target}`, source: edge.source, target: edge.target },
+    })
+  }
+
+  return elements
+}
+
 function ZoomButton({ label, onClick, title }: { label: string; onClick: () => void; title?: string }) {
   return (
     <button
@@ -73,54 +195,13 @@ function ZoomButton({ label, onClick, title }: { label: string; onClick: () => v
   )
 }
 
-function buildElements(topology: TopologyData, devices: Record<string, Device>): ElementDefinition[] {
-  const elements: ElementDefinition[] = []
-
-  for (const node of topology.nodes) {
-    const device = devices[node.id]
-    const vendor = device?.vendor ?? node.vendor
-    const badge = VENDOR_BADGE[vendor] ?? vendor.slice(0, 4).toUpperCase()
-    const isConsumer = node.is_consumer_grade
-
-    elements.push({
-      group: 'nodes',
-      data: {
-        id: node.id,
-        label: `${node.label}\n${badge}`,
-        category: node.category,
-        state: node.state,
-        vendor,
-        site_id: node.site_id,
-        is_consumer: isConsumer,
-      },
-      style: {
-        'background-color': STATE_COLOR[node.state as DeviceState] ?? c.down,
-        'shape': CATEGORY_SHAPE[node.category as DeviceCategory] ?? 'ellipse',
-        'border-color': isConsumer ? '#f97316' : '#2a3647',
-        'border-width': isConsumer ? 3 : 1,
-      },
-    })
-  }
-
-  for (const edge of topology.edges) {
-    elements.push({
-      group: 'edges',
-      data: {
-        id: `${edge.source}-${edge.target}`,
-        source: edge.source,
-        target: edge.target,
-      },
-    })
-  }
-
-  return elements
-}
-
 interface Props {
   topology: TopologyData | null
   devices: Record<string, Device>
+  sites: Record<string, Site>
   selectedSiteId: string | null
   onDeviceClick: (deviceId: string) => void
+  onSiteSelect: (siteId: string | null) => void
   isMobile?: boolean
 }
 
@@ -132,33 +213,53 @@ function computeUiScale(isMobile: boolean): number {
   return Math.min(2.2, Math.max(1, window.innerWidth / 1800))
 }
 
-export function TopologyView({ topology, devices, selectedSiteId, onDeviceClick, isMobile = false }: Props) {
+export function TopologyView({
+  topology, devices, sites, selectedSiteId, onDeviceClick, onSiteSelect, isMobile = false,
+}: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const cyRef = useRef<Core | null>(null)
+  const siteMode = !selectedSiteId
 
   useEffect(() => {
     if (!containerRef.current || !topology) return
 
-    const filteredTopology = selectedSiteId
-      ? {
-          nodes: topology.nodes.filter(n => n.site_id === selectedSiteId),
-          edges: topology.edges.filter(e => {
-            const srcNode = topology.nodes.find(n => n.id === e.source)
-            const tgtNode = topology.nodes.find(n => n.id === e.target)
-            return srcNode?.site_id === selectedSiteId && tgtNode?.site_id === selectedSiteId
-          }),
-        }
-      : topology
-
-    const elements = buildElements(filteredTopology, devices)
-
-    if (cyRef.current) {
-      cyRef.current.destroy()
-    }
-
     const uiScale = computeUiScale(isMobile)
     const nodeSize = Math.round((isMobile ? 44 : 34) * uiScale)
     const fontSize = `${Math.round((isMobile ? 11 : 10) * uiScale)}px`
+
+    // Build either the site overview or the in-site device graph
+    let elements: ElementDefinition[]
+    let layout: cytoscape.LayoutOptions
+    if (siteMode) {
+      elements = buildSiteElements(sites, devices, uiScale)
+      layout = {
+        name: 'concentric',
+        concentric: (n: cytoscape.NodeSingular) => (n.data('kind') === 'core' ? 10 : 1),
+        levelWidth: () => 1,
+        minNodeSpacing: Math.round(48 * uiScale),
+        padding: 30,
+        avoidOverlap: true,
+      } as cytoscape.LayoutOptions
+    } else {
+      const filtered = {
+        nodes: topology.nodes.filter(n => n.site_id === selectedSiteId),
+        edges: topology.edges.filter(e => {
+          const src = topology.nodes.find(n => n.id === e.source)
+          const tgt = topology.nodes.find(n => n.id === e.target)
+          return src?.site_id === selectedSiteId && tgt?.site_id === selectedSiteId
+        }),
+      }
+      elements = buildElements(filtered, devices)
+      layout = {
+        name: 'breadthfirst',
+        directed: true,
+        padding: 20,
+        spacingFactor: 1.4 * uiScale,
+        avoidOverlap: true,
+      } as cytoscape.LayoutOptions
+    }
+
+    if (cyRef.current) cyRef.current.destroy()
 
     const cy = cytoscape({
       container: containerRef.current,
@@ -174,9 +275,9 @@ export function TopologyView({ topology, devices, selectedSiteId, onDeviceClick,
             'text-halign': 'center',
             'color': c.dim,
             'font-size': fontSize,
-            'font-family': "IBM Plex Mono, monospace",
+            'font-family': 'IBM Plex Mono, monospace',
             'text-wrap': 'wrap',
-            'text-max-width': `${Math.round((isMobile ? 100 : 90) * uiScale)}px`,
+            'text-max-width': `${Math.round((isMobile ? 100 : 96) * uiScale)}px`,
             'text-margin-y': Math.round((isMobile ? 6 : 4) * uiScale),
           },
         },
@@ -191,13 +292,12 @@ export function TopologyView({ topology, devices, selectedSiteId, onDeviceClick,
           },
         },
         {
+          selector: 'node[kind="site"], node[kind="core"]',
+          style: { 'color': c.text, 'text-margin-y': Math.round(6 * uiScale) },
+        },
+        {
           selector: 'node:selected',
-          style: {
-            'border-color': c.accent,
-            'border-width': 3,
-            'width': nodeSize * 1.25,
-            'height': nodeSize * 1.25,
-          },
+          style: { 'border-color': c.accent, 'border-width': 3 },
         },
         {
           selector: 'node[state="failed"]',
@@ -208,13 +308,7 @@ export function TopologyView({ topology, devices, selectedSiteId, onDeviceClick,
           style: { 'opacity': 0.5 },
         },
       ],
-      layout: {
-        name: 'breadthfirst',
-        directed: true,
-        padding: 20,
-        spacingFactor: 1.4 * uiScale,
-        avoidOverlap: true,
-      },
+      layout,
       userZoomingEnabled: true,
       userPanningEnabled: true,
       boxSelectionEnabled: false,
@@ -225,17 +319,17 @@ export function TopologyView({ topology, devices, selectedSiteId, onDeviceClick,
       desktopTapThreshold: 4,
     })
 
-    // Once the layout settles, fit the graph to fill the canvas so a narrow
-    // tree doesn't leave most of a wide 4K viewport empty.
     cy.one('layoutstop', () => cy.fit(undefined, Math.round(40 * uiScale)))
 
     cy.on('tap', 'node', (evt) => {
-      onDeviceClick(evt.target.id())
+      const kind = evt.target.data('kind')
+      if (kind === 'site') onSiteSelect(evt.target.id())
+      else if (kind === 'device') onDeviceClick(evt.target.id())
+      // core node: no-op
     })
 
     cyRef.current = cy
 
-    // Keep the graph filling the canvas when the window is resized.
     const handleResize = () => {
       cy.resize()
       cy.fit(undefined, Math.round(40 * uiScale))
@@ -247,20 +341,34 @@ export function TopologyView({ topology, devices, selectedSiteId, onDeviceClick,
       cy.destroy()
       cyRef.current = null
     }
-  }, [topology, selectedSiteId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [topology, selectedSiteId, sites]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Live-update node colors without full re-render
+  // Live-update colors/labels without a full rebuild
   useEffect(() => {
     const cy = cyRef.current
     if (!cy) return
     cy.nodes().forEach(node => {
-      const device = devices[node.id()]
-      if (device) {
-        node.style('background-color', STATE_COLOR[device.state] ?? '#6b7280')
-        node.data('state', device.state)
+      const kind = node.data('kind')
+      if (kind === 'site') {
+        const site = sites[node.id()]
+        if (!site) return
+        const st = siteStats(site.device_ids, devices)
+        node.style('background-color', healthColor(st))
+        node.style('border-color', st.failed > 0 ? c.crit : '#2a3647')
+        node.style('border-width', st.failed > 0 ? 3 : 1)
+        node.data('label', `${site.name}\n${st.impaired}/${st.total} impaired`)
+      } else if (kind === 'core') {
+        const allIds = Object.values(sites).flatMap(s => s.device_ids)
+        node.style('background-color', healthColor(siteStats(allIds, devices)))
+      } else {
+        const device = devices[node.id()]
+        if (device) {
+          node.style('background-color', STATE_COLOR[device.state] ?? c.down)
+          node.data('state', device.state)
+        }
       }
     })
-  }, [devices])
+  }, [devices, sites])
 
   const zoomBy = (factor: number) => {
     const cy = cyRef.current
@@ -268,17 +376,48 @@ export function TopologyView({ topology, devices, selectedSiteId, onDeviceClick,
     cy.zoom({ level: cy.zoom() * factor, renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } })
   }
 
-  const fitView = () => {
-    const cy = cyRef.current
-    if (!cy) return
-    cy.fit(undefined, 40)
-  }
+  const fitView = () => cyRef.current?.fit(undefined, 40)
+
+  const selectedSite = selectedSiteId ? sites[selectedSiteId] : null
 
   return (
     // transparent so the body's blueprint grid shows behind the graph —
     // a network diagram on graph paper
     <div style={{ position: 'relative', width: '100%', height: '100%', background: 'transparent' }}>
       <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+
+      {/* Breadcrumb / scope */}
+      <div style={{
+        position: 'absolute', top: 10, left: 10,
+        display: 'flex', alignItems: 'center', gap: 8,
+        background: 'rgba(15,21,32,0.9)',
+        border: `1px solid ${c.line}`,
+        borderRadius: radius.md,
+        padding: '6px 11px',
+        backdropFilter: 'blur(4px)',
+        fontSize: 12,
+      }}>
+        {siteMode ? (
+          <span style={{ color: c.dim }}>
+            <span style={{ color: c.text, fontWeight: 600 }}>All sites</span>
+            <span style={{ color: c.faint, marginLeft: 8, fontSize: 11 }}>· tap a site to drill in</span>
+          </span>
+        ) : (
+          <>
+            <button
+              onClick={() => onSiteSelect(null)}
+              style={{
+                background: 'transparent', border: 'none', color: c.accent,
+                cursor: 'pointer', fontSize: 12, padding: 0, fontWeight: 600,
+              }}
+            >
+              ← All sites
+            </button>
+            <span style={{ color: c.faint }}>/</span>
+            <span style={{ color: c.text, fontWeight: 600 }}>{selectedSite?.name ?? selectedSiteId}</span>
+          </>
+        )}
+      </div>
 
       {/* Zoom controls */}
       <div style={{
@@ -290,6 +429,7 @@ export function TopologyView({ topology, devices, selectedSiteId, onDeviceClick,
         <ZoomButton label="⤢" onClick={fitView} title="Fit to view" />
       </div>
 
+      {/* Legend */}
       <div style={{
         position: 'absolute', top: 10, right: 10,
         background: 'rgba(15,21,32,0.9)',
@@ -301,19 +441,36 @@ export function TopologyView({ topology, devices, selectedSiteId, onDeviceClick,
         fontFamily: font.sans,
         backdropFilter: 'blur(4px)',
       }}>
-        {Object.entries(STATE_COLOR).map(([state, color]) => (
-          <div key={state} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-            <Led color={color} size={9} pulse={state === 'failed'} />
-            <span style={{ textTransform: 'capitalize' }}>{state}</span>
-          </div>
-        ))}
-        <div style={{ marginTop: 7, borderTop: `1px solid ${c.line}`, paddingTop: 6 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ width: 9, height: 9, border: '2px solid #f97316', borderRadius: 2 }} />
-            <span>shadow IT</span>
-          </div>
-        </div>
+        {siteMode ? (
+          <>
+            <LegendRow color={c.ok} label="Healthy site" />
+            <LegendRow color={c.warn} label="Some impaired" />
+            <LegendRow color={c.crit} label="Major outage" pulse />
+            <div style={{ marginTop: 6, fontSize: 10, color: c.faint }}>node size = device count</div>
+          </>
+        ) : (
+          <>
+            {Object.entries(STATE_COLOR).map(([state, color]) => (
+              <LegendRow key={state} color={color} label={state} pulse={state === 'failed'} cap />
+            ))}
+            <div style={{ marginTop: 7, borderTop: `1px solid ${c.line}`, paddingTop: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ width: 9, height: 9, border: '2px solid #f97316', borderRadius: 2 }} />
+                <span>shadow IT</span>
+              </div>
+            </div>
+          </>
+        )}
       </div>
+    </div>
+  )
+}
+
+function LegendRow({ color, label, pulse, cap }: { color: string; label: string; pulse?: boolean; cap?: boolean }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+      <Led color={color} size={9} pulse={pulse} />
+      <span style={{ textTransform: cap ? 'capitalize' : 'none' }}>{label}</span>
     </div>
   )
 }
