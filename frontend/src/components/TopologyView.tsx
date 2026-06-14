@@ -96,9 +96,10 @@ interface Props {
   devices: Record<string, Device>
   selectedSiteId: string | null
   onDeviceClick: (deviceId: string) => void
+  isMobile?: boolean
 }
 
-export function TopologyView({ topology, devices, selectedSiteId, onDeviceClick }: Props) {
+export function TopologyView({ topology, devices, selectedSiteId, onDeviceClick, isMobile = false }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const cyRef = useRef<Core | null>(null)
 
@@ -122,6 +123,9 @@ export function TopologyView({ topology, devices, selectedSiteId, onDeviceClick 
       cyRef.current.destroy()
     }
 
+    const nodeSize = isMobile ? 44 : 32
+    const fontSize = isMobile ? '11px' : '9px'
+
     const cy = cytoscape({
       container: containerRef.current,
       elements,
@@ -129,17 +133,17 @@ export function TopologyView({ topology, devices, selectedSiteId, onDeviceClick 
         {
           selector: 'node',
           style: {
-            'width': 32,
-            'height': 32,
+            'width': nodeSize,
+            'height': nodeSize,
             'label': 'data(label)',
             'text-valign': 'bottom',
             'text-halign': 'center',
             'color': '#d1d5db',
-            'font-size': '9px',
+            'font-size': fontSize,
             'font-family': 'Courier New, monospace',
             'text-wrap': 'wrap',
-            'text-max-width': '80px',
-            'text-margin-y': 4,
+            'text-max-width': isMobile ? '100px' : '80px',
+            'text-margin-y': isMobile ? 6 : 4,
           },
         },
         {
@@ -181,6 +185,10 @@ export function TopologyView({ topology, devices, selectedSiteId, onDeviceClick 
       userPanningEnabled: true,
       boxSelectionEnabled: false,
       wheelSensitivity: 0.3,
+      minZoom: 0.1,
+      maxZoom: 4,
+      touchTapThreshold: 8,
+      desktopTapThreshold: 4,
     })
 
     cy.on('tap', 'node', (evt) => {

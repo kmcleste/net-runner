@@ -55,9 +55,10 @@ interface Props {
   onMaintenance: (id: string, enable: boolean) => void
   onInjectFailure: (id: string, failureModeId: string) => void
   onApiCall: (id: string, action: string) => Promise<APICallResult>
+  inline?: boolean  // true = renders in flow (inside BottomSheet), false = fixed sidebar
 }
 
-export function DevicePanel({ device, onClose, onReboot, onMaintenance, onInjectFailure, onApiCall }: Props) {
+export function DevicePanel({ device, onClose, onReboot, onMaintenance, onInjectFailure, onApiCall, inline = false }: Props) {
   const [selectedFailure, setSelectedFailure] = useState('')
   const [apiAction, setApiAction] = useState('get_status')
   const [apiResult, setApiResult] = useState<APICallResult | null>(null)
@@ -79,23 +80,14 @@ export function DevicePanel({ device, onClose, onReboot, onMaintenance, onInject
     }
   }
 
+  const containerStyle: React.CSSProperties = inline
+    ? { display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }
+    : { position: 'fixed', right: 310, top: 52, width: 380, bottom: 0, background: '#0f172a', borderLeft: '1px solid #1e293b', borderRight: '1px solid #1e293b', display: 'flex', flexDirection: 'column', zIndex: 100, overflow: 'hidden' }
+
   return (
-    <div style={{
-      position: 'fixed',
-      right: 310,
-      top: 52,
-      width: 380,
-      bottom: 0,
-      background: '#0f172a',
-      borderLeft: '1px solid #1e293b',
-      borderRight: '1px solid #1e293b',
-      display: 'flex',
-      flexDirection: 'column',
-      zIndex: 100,
-      overflow: 'hidden',
-    }}>
-      {/* Header */}
-      <div style={{
+    <div style={containerStyle}>
+      {/* Header — hidden when inline since BottomSheet renders its own title */}
+      {!inline && <div style={{
         padding: '10px 14px',
         borderBottom: '1px solid #1e293b',
         display: 'flex',
@@ -124,7 +116,7 @@ export function DevicePanel({ device, onClose, onReboot, onMaintenance, onInject
             background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 16,
           }}>×</button>
         </div>
-      </div>
+      </div>}
 
       {/* Body */}
       <div style={{ flex: 1, overflowY: 'auto', padding: 14 }}>

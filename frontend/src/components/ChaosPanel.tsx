@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { Site } from '../types'
 
 const PATTERNS = [
@@ -53,6 +53,7 @@ interface Props {
   failureMultiplier: number
   onChangeSeed: (seed: number) => void
   currentSeed: number
+  inline?: boolean  // renders content directly without the floating panel chrome
 }
 
 export function ChaosPanel({
@@ -62,12 +63,18 @@ export function ChaosPanel({
   failureMultiplier,
   onChangeSeed,
   currentSeed,
+  inline = false,
 }: Props) {
   const [open, setOpen] = useState(false)
   const [selectedSite, setSelectedSite] = useState('')
   const [selectedVendor, setSelectedVendor] = useState('')
   const [seedInput, setSeedInput] = useState(String(currentSeed))
   const [multiplier, setMultiplier] = useState(failureMultiplier)
+
+  // Inline mode: render content directly (used inside BottomSheet on mobile)
+  if (inline) {
+    return <ChaosContent sites={sites} onTriggerPattern={onTriggerPattern} onSetMultiplier={onSetMultiplier} multiplier={multiplier} setMultiplier={setMultiplier} seedInput={seedInput} setSeedInput={setSeedInput} selectedSite={selectedSite} setSelectedSite={setSelectedSite} selectedVendor={selectedVendor} setSelectedVendor={setSelectedVendor} onChangeSeed={onChangeSeed} />
+  }
 
   if (!open) {
     return (
@@ -128,7 +135,7 @@ export function ChaosPanel({
         </button>
       </div>
 
-      <div style={{ padding: 12, maxHeight: 480, overflowY: 'auto' }}>
+      <div style={{ padding: 12, maxHeight: 480, overflowY: 'auto', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
 
         {/* Failure multiplier */}
         <div style={{ marginBottom: 14 }}>
@@ -307,6 +314,91 @@ export function ChaosPanel({
             </div>
           ))}
         </div>
+      </div>
+    </div>
+  )
+}
+
+// Shared content component used both inline (mobile) and inside the floating panel (desktop)
+interface ContentProps {
+  sites: Record<string, Site>
+  onTriggerPattern: (pattern: string, siteId?: string, vendor?: string) => void
+  onSetMultiplier: (v: number) => void
+  multiplier: number
+  setMultiplier: (v: number) => void
+  seedInput: string
+  setSeedInput: (v: string) => void
+  selectedSite: string
+  setSelectedSite: (v: string) => void
+  selectedVendor: string
+  setSelectedVendor: (v: string) => void
+  onChangeSeed: (seed: number) => void
+}
+
+function ChaosContent({ sites, onTriggerPattern, onSetMultiplier, multiplier, setMultiplier, seedInput, setSeedInput, selectedSite, setSelectedSite, selectedVendor, setSelectedVendor, onChangeSeed }: ContentProps) {
+  return (
+    <div style={{ padding: 12 }}>
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 9, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6, fontWeight: 700 }}>
+          Global Failure Rate
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <input type='range' min={0.1} max={10} step={0.1} value={multiplier}
+            onChange={e => setMultiplier(parseFloat(e.target.value))}
+            onMouseUp={() => onSetMultiplier(multiplier)}
+            onTouchEnd={() => onSetMultiplier(multiplier)}
+            style={{ flex: 1, accentColor: '#ef4444' }} />
+          <span style={{ fontSize: 13, fontWeight: 700, color: multiplier > 3 ? '#ef4444' : multiplier > 1.5 ? '#f97316' : '#22c55e', minWidth: 40, textAlign: 'right' }}>
+            {multiplier.toFixed(1)}×
+          </span>
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 9, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6, fontWeight: 700 }}>World Seed</div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <input type='number' value={seedInput} onChange={e => setSeedInput(e.target.value)}
+            style={{ flex: 1, background: '#111827', border: '1px solid #374151', borderRadius: 4, color: '#d1d5db', fontSize: 12, padding: '4px 8px', fontFamily: 'Courier New, monospace' }} />
+          <button onClick={() => { const n = parseInt(seedInput); if (!isNaN(n)) onChangeSeed(n) }}
+            style={{ background: '#1d4ed8', border: '1px solid #3b82f6', borderRadius: 4, color: '#f9fafb', fontSize: 10, padding: '4px 10px', cursor: 'pointer' }}>
+            Regen
+          </button>
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 9, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6, fontWeight: 700 }}>Scope</div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <select value={selectedSite} onChange={e => setSelectedSite(e.target.value)}
+            style={{ flex: 1, background: '#111827', border: '1px solid #374151', borderRadius: 4, color: '#d1d5db', fontSize: 10, padding: '4px 6px' }}>
+            <option value=''>All sites</option>
+            {Object.values(sites).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <select value={selectedVendor} onChange={e => setSelectedVendor(e.target.value)}
+            style={{ flex: 1, background: '#111827', border: '1px solid #374151', borderRadius: 4, color: '#d1d5db', fontSize: 10, padding: '4px 6px' }}>
+            <option value=''>All vendors</option>
+            {['Cisco', 'Cisco Meraki', 'Aruba', 'Juniper', 'Palo Alto', 'Fortinet', 'Dell', 'HPE', 'Netgear', 'TP-Link'].map(v => (
+              <option key={v} value={v}>{v}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <div style={{ fontSize: 9, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, fontWeight: 700 }}>Chaos Patterns</div>
+        {PATTERNS.map(p => (
+          <div key={p.id} style={{ padding: '8px 10px', background: '#111827', border: `1px solid ${SEVERITY_COLOR[p.severity]}33`, borderRadius: 6, marginBottom: 6 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <div style={{ fontSize: 12, color: '#f9fafb', fontWeight: 600 }}>{p.icon} {p.name}</div>
+              <button
+                onClick={() => onTriggerPattern(p.id, selectedSite || undefined, selectedVendor || undefined)}
+                style={{ background: SEVERITY_COLOR[p.severity] + '22', border: `1px solid ${SEVERITY_COLOR[p.severity]}`, borderRadius: 4, color: SEVERITY_COLOR[p.severity], fontSize: 9, fontWeight: 700, padding: '4px 10px', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                TRIGGER
+              </button>
+            </div>
+            <div style={{ fontSize: 9, color: '#6b7280', lineHeight: 1.5 }}>{p.description}</div>
+          </div>
+        ))}
       </div>
     </div>
   )
