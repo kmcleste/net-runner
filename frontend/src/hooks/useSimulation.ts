@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Alert, Device, Site, TopologyData, WorldSummary, WSMessage } from '../types'
 
-const API = '/api'
-const WS_URL = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`
+const API_BASE = import.meta.env.VITE_API_URL ?? ''
+const API = `${API_BASE}/api`
+const WS_URL = import.meta.env.VITE_WS_URL
+  ?? `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`
 
 interface SimState {
   summary: WorldSummary | null
