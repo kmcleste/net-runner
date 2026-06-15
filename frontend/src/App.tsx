@@ -92,6 +92,7 @@ export default function App() {
                 devices={sim.devices}
                 selectedSiteId={selectedSiteId}
                 onSiteSelect={handleGeoSiteSelect}
+                onDrillIntoTopo={(siteId) => { setSelectedSiteId(siteId); setMobileTab('topology') }}
                 isMobile
                 onSwitchToTopo={() => setMobileTab('topology')}
               />
@@ -204,6 +205,7 @@ export default function App() {
                 devices={sim.devices}
                 selectedSiteId={selectedSiteId}
                 onSiteSelect={handleGeoSiteSelect}
+                onDrillIntoTopo={(siteId) => { setSelectedSiteId(siteId); setDesktopView('topology') }}
               />
             </div>
           )}
