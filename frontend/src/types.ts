@@ -156,3 +156,62 @@ export type WSMessage =
   | { type: 'tick'; data: WorldSummary }
   | { type: 'ping' }
   | { type: 'pong' }
+
+// ---------------------------------------------------------------------------
+// Remediation engine types (standalone service)
+// ---------------------------------------------------------------------------
+
+export interface RemediationAction {
+  id: string
+  created_at: string
+  rule_id: string | null
+  agent_type: 'rules' | 'ml' | 'llm'
+  device_id: string
+  hostname: string
+  site_name: string
+  action_type: 'reboot' | 'maintenance_on' | 'maintenance_off' | 'alert'
+  reason: string
+  severity: string
+  auto_execute: boolean
+  status: 'pending' | 'approved' | 'auto' | 'rejected' | 'executing' | 'done' | 'failed'
+  approved_by: string | null
+  executed_at: string | null
+  result: string | null
+}
+
+export interface AgentThought {
+  id: string
+  timestamp: string
+  content: string
+  is_complete: boolean
+  actions_proposed: string[]
+}
+
+export interface RemediationConfig {
+  human_in_loop: boolean
+  rules_enabled: boolean
+  ml_enabled: boolean
+  llm_enabled: boolean
+  llm_auto_trigger: boolean
+  rules_status: Record<string, boolean>
+}
+
+export interface RuleDefinition {
+  id: string
+  name: string
+  description: string
+  severity: string
+  action_type: string
+  auto_execute: boolean
+  cooldown_ticks: number
+  enabled: boolean
+}
+
+export type RemediationWSMessage =
+  | { type: 'snapshot'; data: { config: RemediationConfig; rules: RuleDefinition[]; actions: RemediationAction[]; agent: Record<string, unknown>; risk_scores: Record<string, number>; source_url: string } }
+  | { type: 'action'; data: RemediationAction }
+  | { type: 'ml_scores'; data: Record<string, number> }
+  | { type: 'agent_thought'; data: AgentThought }
+  | { type: 'config'; data: RemediationConfig }
+  | { type: 'ping' }
+  | { type: 'pong' }

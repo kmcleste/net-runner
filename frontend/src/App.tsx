@@ -6,8 +6,10 @@ import { ChaosPanel } from './components/ChaosPanel'
 import { ChoroplethView } from './components/ChoroplethView'
 import { Dashboard } from './components/Dashboard'
 import { DevicePanel } from './components/DevicePanel'
+import { RemediationPanel } from './components/RemediationPanel'
 import { TopologyView } from './components/TopologyView'
 import { useIsMobile } from './hooks/useIsMobile'
+import { useRemediation } from './hooks/useRemediation'
 import { useSimulation } from './hooks/useSimulation'
 import { APICallResult } from './types'
 import { c, font, radius, tint } from './theme'
@@ -17,6 +19,7 @@ type DesktopView = 'topology' | 'geo'
 
 export default function App() {
   const sim = useSimulation()
+  const rem = useRemediation()
   const isMobile = useIsMobile()
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null)
   const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null)
@@ -116,6 +119,21 @@ export default function App() {
                 currentSeed={sim.summary?.seed ?? 42}
                 inline
               />
+              <div style={{ marginTop: 12 }}>
+                <RemediationPanel
+                  actions={rem.actions}
+                  config={rem.config}
+                  rules={rem.rules}
+                  agentThought={rem.agentThought}
+                  agentRunning={rem.agentRunning}
+                  onApprove={rem.approve}
+                  onReject={rem.reject}
+                  onUpdateConfig={rem.updateConfig}
+                  onToggleRule={rem.toggleRule}
+                  onTriggerAgent={rem.triggerAgent}
+                  inline
+                />
+              </div>
             </div>
           )}
         </div>
@@ -232,6 +250,19 @@ export default function App() {
         failureMultiplier={sim.summary?.global_failure_multiplier ?? 1.0}
         onChangeSeed={sim.changeSeed}
         currentSeed={sim.summary?.seed ?? 42}
+      />
+
+      <RemediationPanel
+        actions={rem.actions}
+        config={rem.config}
+        rules={rem.rules}
+        agentThought={rem.agentThought}
+        agentRunning={rem.agentRunning}
+        onApprove={rem.approve}
+        onReject={rem.reject}
+        onUpdateConfig={rem.updateConfig}
+        onToggleRule={rem.toggleRule}
+        onTriggerAgent={rem.triggerAgent}
       />
 
       {!sim.connected && <DisconnectBanner />}
