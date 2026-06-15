@@ -1,6 +1,6 @@
 import { c, font, tint } from '../theme'
 
-type Tab = 'topology' | 'alerts' | 'chaos'
+type Tab = 'topology' | 'geo' | 'alerts' | 'chaos'
 
 interface Props {
   active: Tab
@@ -9,9 +9,10 @@ interface Props {
 }
 
 const TABS: { id: Tab; glyph: string; label: string }[] = [
-  { id: 'topology', glyph: '◈', label: 'Map' },
-  { id: 'alerts', glyph: '◉', label: 'Alerts' },
-  { id: 'chaos', glyph: '⚡', label: 'Chaos' },
+  { id: 'topology', glyph: '◈', label: 'Topo' },
+  { id: 'geo',      glyph: '◎', label: 'Geo' },
+  { id: 'alerts',   glyph: '◉', label: 'Alerts' },
+  { id: 'chaos',    glyph: '⚡', label: 'Chaos' },
 ]
 
 export function BottomNav({ active, onChange, alertCount }: Props) {
@@ -26,7 +27,7 @@ export function BottomNav({ active, onChange, alertCount }: Props) {
       {TABS.map(tab => {
         const isActive = tab.id === active
         const showBadge = tab.id === 'alerts' && alertCount > 0
-        const tone = tab.id === 'chaos' ? c.crit : c.accent
+        const tone = tab.id === 'chaos' ? c.crit : tab.id === 'geo' ? '#9b7dff' : c.accent
         return (
           <button
             key={tab.id}

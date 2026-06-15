@@ -2,6 +2,7 @@ import cytoscape, { Core, ElementDefinition } from 'cytoscape'
 import { useEffect, useRef } from 'react'
 import { Device, DeviceCategory, DeviceState, Site, TopologyData } from '../types'
 import { c, font, radius } from '../theme'
+import { healthColor, siteStats } from '../utils/siteHealth'
 import { Led } from './Led'
 
 // Color by state — shared LED palette so nodes match the rest of the console
@@ -53,28 +54,6 @@ const VENDOR_BADGE: Record<string, string> = {
 // ---------------------------------------------------------------------------
 // Site-level aggregation (the "All sites" overview)
 // ---------------------------------------------------------------------------
-
-interface SiteStats { total: number; healthy: number; impaired: number; failed: number }
-
-function siteStats(deviceIds: string[], devices: Record<string, Device>): SiteStats {
-  let total = 0, healthy = 0, failed = 0
-  for (const id of deviceIds) {
-    const d = devices[id]
-    if (!d) continue
-    total++
-    if (d.state === 'healthy') healthy++
-    else if (d.state === 'failed' || d.state === 'unreachable') failed++
-  }
-  return { total, healthy, impaired: total - healthy, failed }
-}
-
-function healthColor(s: SiteStats): string {
-  if (s.total === 0) return c.down
-  const pct = s.healthy / s.total
-  if (pct >= 0.98) return c.ok
-  if (pct >= 0.85) return c.warn
-  return c.crit
-}
 
 function buildSiteElements(
   sites: Record<string, Site>,

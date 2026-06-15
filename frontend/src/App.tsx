@@ -3,15 +3,17 @@ import { AlertConsole } from './components/AlertConsole'
 import { BottomNav } from './components/BottomNav'
 import { BottomSheet } from './components/BottomSheet'
 import { ChaosPanel } from './components/ChaosPanel'
+import { ChoroplethView } from './components/ChoroplethView'
 import { Dashboard } from './components/Dashboard'
 import { DevicePanel } from './components/DevicePanel'
 import { TopologyView } from './components/TopologyView'
 import { useIsMobile } from './hooks/useIsMobile'
 import { useSimulation } from './hooks/useSimulation'
 import { APICallResult } from './types'
-import { c, font } from './theme'
+import { c, font, radius, tint } from './theme'
 
-type MobileTab = 'topology' | 'alerts' | 'chaos'
+type MobileTab = 'topology' | 'geo' | 'alerts' | 'chaos'
+type DesktopView = 'topology' | 'geo'
 
 export default function App() {
   const sim = useSimulation()
@@ -19,6 +21,7 @@ export default function App() {
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null)
   const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null)
   const [mobileTab, setMobileTab] = useState<MobileTab>('topology')
+  const [desktopView, setDesktopView] = useState<DesktopView>('topology')
 
   const selectedDevice = selectedDeviceId ? sim.devices[selectedDeviceId] ?? null : null
 
@@ -27,7 +30,13 @@ export default function App() {
 
   const handleDeviceClick = (id: string) => {
     setSelectedDeviceId(id === selectedDeviceId ? null : id)
-    if (isMobile) setMobileTab('topology')  // keep map visible, sheet slides up
+    if (isMobile) setMobileTab('topology')
+  }
+
+  // When a site is selected from the choropleth, switch to topology and drill in
+  const handleGeoSiteSelect = (siteId: string | null) => {
+    setSelectedSiteId(siteId)
+    if (isMobile && siteId) setMobileTab('topology')
   }
 
   if (sim.loading) {
@@ -73,6 +82,18 @@ export default function App() {
               isMobile
             />
           </div>
+
+          {mobileTab === 'geo' && (
+            <div style={{ position: 'absolute', inset: 0 }}>
+              <ChoroplethView
+                sites={sim.sites}
+                devices={sim.devices}
+                selectedSiteId={selectedSiteId}
+                onSiteSelect={handleGeoSiteSelect}
+                isMobile
+              />
+            </div>
+          )}
 
           {mobileTab === 'alerts' && (
             <div style={{ position: 'absolute', inset: 0, overflowY: 'auto' }}>
@@ -142,15 +163,47 @@ export default function App() {
       />
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
-        <div style={{ flex: 1, overflow: 'hidden' }}>
-          <TopologyView
-            topology={sim.topology}
-            devices={sim.devices}
-            sites={sim.sites}
-            selectedSiteId={selectedSiteId}
-            onDeviceClick={handleDeviceClick}
-            onSiteSelect={setSelectedSiteId}
+        {/* View toggle — Topology / Geo */}
+        <div style={{
+          position: 'absolute', top: 12, right: selectedDevice ? 380 : 340, zIndex: 20,
+          display: 'flex', gap: 1, background: c.panel, border: `1px solid ${c.line}`, borderRadius: radius.md,
+        }}>
+          <ViewToggle
+            label="◈ Topo"
+            active={desktopView === 'topology'}
+            onClick={() => setDesktopView('topology')}
           />
+          <ViewToggle
+            label="◎ Geo"
+            active={desktopView === 'geo'}
+            onClick={() => setDesktopView('geo')}
+            accentColor={c.human}
+          />
+        </div>
+
+        <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+          {/* Topology — always mounted to keep Cytoscape alive */}
+          <div style={{ position: 'absolute', inset: 0, display: desktopView === 'topology' ? 'block' : 'none' }}>
+            <TopologyView
+              topology={sim.topology}
+              devices={sim.devices}
+              sites={sim.sites}
+              selectedSiteId={selectedSiteId}
+              onDeviceClick={handleDeviceClick}
+              onSiteSelect={setSelectedSiteId}
+            />
+          </div>
+
+          {desktopView === 'geo' && (
+            <div style={{ position: 'absolute', inset: 0 }}>
+              <ChoroplethView
+                sites={sim.sites}
+                devices={sim.devices}
+                selectedSiteId={selectedSiteId}
+                onSiteSelect={handleGeoSiteSelect}
+              />
+            </div>
+          )}
         </div>
 
         {selectedDevice && (
@@ -178,6 +231,37 @@ export default function App() {
 
       {!sim.connected && <DisconnectBanner />}
     </div>
+  )
+}
+
+function ViewToggle({
+  label, active, onClick, accentColor = c.accent,
+}: {
+  label: string
+  active: boolean
+  onClick: () => void
+  accentColor?: string
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        background: active ? tint(accentColor, 0.14) : 'transparent',
+        border: 'none',
+        borderRadius: radius.sm,
+        color: active ? accentColor : c.faint,
+        fontSize: 11,
+        fontWeight: active ? 700 : 500,
+        fontFamily: font.sans,
+        padding: '6px 12px',
+        cursor: 'pointer',
+        letterSpacing: 0.5,
+        transition: 'all 0.15s',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {label}
+    </button>
   )
 }
 
