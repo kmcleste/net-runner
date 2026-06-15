@@ -1,17 +1,19 @@
-# railway.toml — defines both services in one repo.
-# Each Railway service reads this file and uses the section matching its
-# $RAILWAY_SERVICE_NAME environment variable (set automatically by Railway).
+# railway.toml — shared config for both Railway services in this project.
 #
-# Services to create in the Railway dashboard:
-#   1. "simulator"    → connects to this repo, Railway picks up [services.simulator]
-#   2. "remediation"  → connects to same repo, picks up [services.remediation]
+# Both services point at the same GitHub repo and build from Dockerfile.combined.
+# RAILWAY_SERVICE_NAME (injected automatically by Railway) selects which process runs.
+#
+# Service names to use in the Railway dashboard:
+#   "simulator"   → runs the net-runner world sim on the injected $PORT
+#   "remediation" → runs the remediation engine on the injected $PORT
 
-[services.simulator]
-dockerfile = "Dockerfile"
-healthcheckPath = "/world"
-healthcheckTimeout = 30
+[build]
+dockerfilePath = "Dockerfile.combined"
 
-[services.remediation]
-dockerfile = "Dockerfile.remediation"
-healthcheckPath = "/health"
-healthcheckTimeout = 30
+[deploy]
+startCommand = """sh -c '
+if [ "$RAILWAY_SERVICE_NAME" = "remediation" ]; then
+  exec uvicorn remediation.main:app --host 0.0.0.0 --port ${PORT:-9000}
+else
+  exec uvicorn net_runner.api.app:app --host 0.0.0.0 --port ${PORT:-8000}
+fi'"""

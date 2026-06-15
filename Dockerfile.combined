@@ -1,0 +1,10 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+COPY pyproject.toml .
+COPY net_runner/ ./net_runner/
+COPY remediation/ ./remediation/
+
+RUN pip install --no-cache-dir -e .
+
+# Start command is selected at runtime via $RAILWAY_SERVICE_NAME (see railway.toml).
