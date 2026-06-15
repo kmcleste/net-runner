@@ -114,9 +114,10 @@ interface Props {
   selectedSiteId: string | null
   onSiteSelect: (siteId: string | null) => void
   isMobile?: boolean
+  onSwitchToTopo?: () => void
 }
 
-export function ChoroplethView({ sites, devices, selectedSiteId, onSiteSelect, isMobile = false }: Props) {
+export function ChoroplethView({ sites, devices, selectedSiteId, onSiteSelect, isMobile = false, onSwitchToTopo }: Props) {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null)
 
   const siteInfos = buildSiteInfos(sites, devices)
@@ -166,6 +167,22 @@ export function ChoroplethView({ sites, devices, selectedSiteId, onSiteSelect, i
           <span style={{ fontSize: 11, color: c.faint, fontFamily: font.mono, letterSpacing: 1 }}>
             GEO / US IMPACT MAP
           </span>
+          {onSwitchToTopo && (
+            <>
+              <span style={{ color: c.line, fontSize: 11 }}>|</span>
+              <button
+                onClick={onSwitchToTopo}
+                style={{
+                  background: 'none', border: 'none', color: c.accent,
+                  fontSize: 11, fontFamily: font.sans, cursor: 'pointer',
+                  padding: 0, fontWeight: 600,
+                  display: 'flex', alignItems: 'center', gap: 4,
+                }}
+              >
+                ◈ Topo
+              </button>
+            </>
+          )}
         </div>
         <Legend />
       </div>

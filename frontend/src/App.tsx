@@ -33,10 +33,11 @@ export default function App() {
     if (isMobile) setMobileTab('topology')
   }
 
-  // When a site is selected from the choropleth, switch to topology and drill in
+  // Selecting a site from the geo view updates the site filter but keeps
+  // the user on the geo tab so they can see the context. The "◈ Topo" inline
+  // button lets them jump to topology when they want it.
   const handleGeoSiteSelect = (siteId: string | null) => {
     setSelectedSiteId(siteId)
-    if (isMobile && siteId) setMobileTab('topology')
   }
 
   if (sim.loading) {
@@ -80,6 +81,7 @@ export default function App() {
               onDeviceClick={handleDeviceClick}
               onSiteSelect={setSelectedSiteId}
               isMobile
+              onSwitchToGeo={() => setMobileTab('geo')}
             />
           </div>
 
@@ -91,6 +93,7 @@ export default function App() {
                 selectedSiteId={selectedSiteId}
                 onSiteSelect={handleGeoSiteSelect}
                 isMobile
+                onSwitchToTopo={() => setMobileTab('topology')}
               />
             </div>
           )}

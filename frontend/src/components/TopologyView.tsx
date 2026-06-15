@@ -188,6 +188,7 @@ interface Props {
   onDeviceClick: (deviceId: string) => void
   onSiteSelect: (siteId: string | null) => void
   isMobile?: boolean
+  onSwitchToGeo?: () => void
 }
 
 // Scale UI up on large / high-DPI displays so a 4K canvas isn't full of
@@ -199,7 +200,7 @@ function computeUiScale(isMobile: boolean): number {
 }
 
 export function TopologyView({
-  topology, devices, sites, selectedSiteId, onDeviceClick, onSiteSelect, isMobile = false,
+  topology, devices, sites, selectedSiteId, onDeviceClick, onSiteSelect, isMobile = false, onSwitchToGeo,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const cyRef = useRef<Core | null>(null)
@@ -412,6 +413,21 @@ export function TopologyView({
             </button>
             <span style={{ color: c.faint }}>/</span>
             <span style={{ color: c.text, fontWeight: 600 }}>{selectedSite?.name ?? selectedSiteId}</span>
+          </>
+        )}
+        {onSwitchToGeo && (
+          <>
+            <span style={{ color: c.line, margin: '0 2px' }}>|</span>
+            <button
+              onClick={onSwitchToGeo}
+              style={{
+                background: 'transparent', border: 'none', color: '#9b7dff',
+                cursor: 'pointer', fontSize: 11, padding: 0, fontWeight: 600,
+                display: 'flex', alignItems: 'center', gap: 4,
+              }}
+            >
+              ◎ Geo
+            </button>
           </>
         )}
       </div>
